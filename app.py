@@ -5,12 +5,27 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
+)
+
+import matplotlib.pyplot as plt
+
 # =====================================================
 # JUDUL
 # =====================================================
 
-st.title("Prediksi Kepadatan Wisata Jeju")
-st.subheader("Multiple Linear Regression")
+st.set_page_config(
+    page_title="Prediksi Kepadatan Wisata Jeju",
+    layout="wide"
+)
+
+st.title("🏝️ Prediksi Kepadatan Wisata Jeju")
+st.markdown(
+    "### Analisis Faktor yang Mempengaruhi Kepadatan Wisata Menggunakan Multiple Linear Regression"
+)
 
 # =====================================================
 # LOAD DATA
@@ -52,6 +67,7 @@ def load_data():
         'Strongwind (>=14m/s, 0/1)': 'StrongWind'
     })
 
+    # Feature Engineering
     df['Month'] = df['Date'].dt.month
     df['Year'] = df['Date'].dt.year
     df['Day'] = df['Date'].dt.day
@@ -64,6 +80,7 @@ def load_data():
         0
     )
 
+    # Lag Feature
     df = df.sort_values('Date')
 
     df['Lag_1'] = df['Total_arrivals'].shift(1)
@@ -73,10 +90,11 @@ def load_data():
 
     return df
 
+
 df = load_data()
 
 # =====================================================
-# FITUR
+# FITUR DAN TARGET
 # =====================================================
 
 X = df[
@@ -98,7 +116,7 @@ X = df[
 y = df['Total_arrivals']
 
 # =====================================================
-# TRAIN MODEL
+# SPLIT DATA
 # =====================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
@@ -108,15 +126,49 @@ X_train, X_test, y_train, y_test = train_test_split(
     random_state=42
 )
 
-model = LinearRegression()
+# =====================================================
+# TRAIN MODEL
+# =====================================================
 
-model.fit(
-    X_train,
-    y_train
+@st.cache_resource
+def train_model():
+
+    model = LinearRegression()
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    return model
+
+model = train_model()
+
+# =====================================================
+# EVALUASI
+# =====================================================
+
+y_pred = model.predict(X_test)
+
+mae = mean_absolute_error(
+    y_test,
+    y_pred
+)
+
+mse = mean_squared_error(
+    y_test,
+    y_pred
+)
+
+rmse = np.sqrt(mse)
+
+r2 = r2_score(
+    y_test,
+    y_pred
 )
 
 # =====================================================
-# SIDEBAR
+# SIDEBAR INPUT
 # =====================================================
 
 st.sidebar.header("Input Prediksi")
@@ -160,14 +212,13 @@ weekend = 1 if dayofweek >= 5 else 0
 # =====================================================
 
 lag_1 = df['Total_arrivals'].iloc[-1]
-
 lag_7 = df['Total_arrivals'].iloc[-7]
 
 # =====================================================
 # PREDIKSI
 # =====================================================
 
-if st.button("Prediksi"):
+if st.button("Prediksi Jumlah Wisatawan"):
 
     input_user = pd.DataFrame(
         [[
@@ -191,20 +242,134 @@ if st.button("Prediksi"):
     )
 
     st.success(
-        f"Prediksi Jumlah Wisatawan : "
-        f"{hasil[0]:,.0f} orang"
+        f"Prediksi Jumlah Wisatawan : {hasil[0]:,.0f} orang"
     )
 
 # =====================================================
-# INFORMASI MODEL
+# EVALUASI MODEL
 # =====================================================
 
 st.markdown("---")
 
-st.write("Jumlah Data :", len(df))
+st.subheader("📊 Evaluasi Model")
 
-st.write("Jumlah Fitur :", len(X.columns))
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "MAE",
+        f"{mae:,.2f}"
+    )
+
+with col2:
+    st.metric(
+        "RMSE",
+        f"{rmse:,.2f}"
+    )
+
+with col3:
+    st.metric(
+        "R²",
+        f"{r2:.4f}"
+    )
+
+st.info(
+    f"""
+    Model mampu menjelaskan sekitar
+    {r2*100:.2f}% variasi jumlah wisatawan.
+    """
+)
+
+# =====================================================
+# INFORMASI DATASET
+# =====================================================
+
+st.markdown("---")
+
+st.subheader("📁 Informasi Dataset")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.metric(
+        "Jumlah Data",
+        len(df)
+    )
+
+with col2:
+    st.metric(
+        "Jumlah Fitur",
+        len(X.columns)
+    )
 
 st.write("Fitur yang digunakan:")
 
 st.write(list(X.columns))
+
+# =====================================================
+# KOEFISIEN REGRESI
+# =====================================================
+
+st.markdown("---")
+
+st.subheader("📈 Koefisien Regresi")
+
+coef_df = pd.DataFrame({
+    'Variabel': X.columns,
+    'Koefisien': model.coef_
+})
+
+coef_df = coef_df.sort_values(
+    by='Koefisien',
+    key=abs,
+    ascending=False
+)
+
+st.dataframe(
+    coef_df,
+    use_container_width=True
+)
+
+# =====================================================
+# VISUALISASI KOEFISIEN
+# =====================================================
+
+fig, ax = plt.subplots(figsize=(10,5))
+
+ax.bar(
+    coef_df['Variabel'],
+    coef_df['Koefisien']
+)
+
+plt.xticks(rotation=45)
+
+plt.title(
+    "Pengaruh Faktor Terhadap Jumlah Wisatawan"
+)
+
+st.pyplot(fig)
+
+# =====================================================
+# AKTUAL VS PREDIKSI
+# =====================================================
+
+st.markdown("---")
+
+st.subheader("📉 Aktual vs Prediksi")
+
+fig2, ax2 = plt.subplots(figsize=(6,6))
+
+ax2.scatter(
+    y_test,
+    y_pred
+)
+
+ax2.set_xlabel("Aktual")
+
+ax2.set_ylabel("Prediksi")
+
+ax2.set_title(
+    "Aktual vs Prediksi"
+)
+
+st.pyplot(fig2)
