@@ -14,7 +14,7 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 
 # =====================================================
-# JUDUL
+# KONFIGURASI HALAMAN
 # =====================================================
 
 st.set_page_config(
@@ -23,8 +23,9 @@ st.set_page_config(
 )
 
 st.title("🏝️ Prediksi Kepadatan Wisata Jeju")
-st.markdown(
-    "### Analisis Faktor yang Mempengaruhi Kepadatan Wisata Menggunakan Multiple Linear Regression"
+st.write(
+    "Analisis Faktor yang Mempengaruhi Kepadatan Wisata "
+    "Menggunakan Multiple Linear Regression"
 )
 
 # =====================================================
@@ -68,6 +69,7 @@ def load_data():
     })
 
     # Feature Engineering
+
     df['Month'] = df['Date'].dt.month
     df['Year'] = df['Date'].dt.year
     df['Day'] = df['Date'].dt.day
@@ -81,6 +83,7 @@ def load_data():
     )
 
     # Lag Feature
+
     df = df.sort_values('Date')
 
     df['Lag_1'] = df['Total_arrivals'].shift(1)
@@ -89,7 +92,6 @@ def load_data():
     df = df.dropna()
 
     return df
-
 
 df = load_data()
 
@@ -116,175 +118,8 @@ X = df[
 y = df['Total_arrivals']
 
 # =====================================================
-# SPLIT DATA
+# INFO DATASET
 # =====================================================
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42
-)
-
-# =====================================================
-# TRAIN MODEL
-# =====================================================
-
-@st.cache_resource
-def train_model():
-
-    model = LinearRegression()
-
-    model.fit(
-        X_train,
-        y_train
-    )
-
-    return model
-
-model = train_model()
-
-# =====================================================
-# EVALUASI
-# =====================================================
-
-y_pred = model.predict(X_test)
-
-mae = mean_absolute_error(
-    y_test,
-    y_pred
-)
-
-mse = mean_squared_error(
-    y_test,
-    y_pred
-)
-
-rmse = np.sqrt(mse)
-
-r2 = r2_score(
-    y_test,
-    y_pred
-)
-
-# =====================================================
-# SIDEBAR INPUT
-# =====================================================
-
-st.sidebar.header("Input Prediksi")
-
-tanggal = st.sidebar.date_input(
-    "Tanggal"
-)
-
-heatwave = st.sidebar.selectbox(
-    "Heatwave",
-    [0, 1]
-)
-
-heavyrain = st.sidebar.selectbox(
-    "Heavy Rain",
-    [0, 1]
-)
-
-strongwind = st.sidebar.selectbox(
-    "Strong Wind",
-    [0, 1]
-)
-
-# =====================================================
-# EKSTRAK TANGGAL
-# =====================================================
-
-tanggal = pd.to_datetime(tanggal)
-
-month = tanggal.month
-year = tanggal.year
-day = tanggal.day
-dayofweek = tanggal.dayofweek
-
-quarter = ((month - 1) // 3) + 1
-
-weekend = 1 if dayofweek >= 5 else 0
-
-# =====================================================
-# DATA HISTORIS
-# =====================================================
-
-lag_1 = df['Total_arrivals'].iloc[-1]
-lag_7 = df['Total_arrivals'].iloc[-7]
-
-# =====================================================
-# PREDIKSI
-# =====================================================
-
-if st.button("Prediksi Jumlah Wisatawan"):
-
-    input_user = pd.DataFrame(
-        [[
-            heatwave,
-            heavyrain,
-            strongwind,
-            month,
-            year,
-            day,
-            dayofweek,
-            quarter,
-            weekend,
-            lag_1,
-            lag_7
-        ]],
-        columns=X.columns
-    )
-
-    hasil = model.predict(
-        input_user
-    )
-
-    st.success(
-        f"Prediksi Jumlah Wisatawan : {hasil[0]:,.0f} orang"
-    )
-
-# =====================================================
-# EVALUASI MODEL
-# =====================================================
-
-st.markdown("---")
-
-st.subheader("📊 Evaluasi Model")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric(
-        "MAE",
-        f"{mae:,.2f}"
-    )
-
-with col2:
-    st.metric(
-        "RMSE",
-        f"{rmse:,.2f}"
-    )
-
-with col3:
-    st.metric(
-        "R²",
-        f"{r2:.4f}"
-    )
-
-st.info(
-    f"""
-    Model mampu menjelaskan sekitar
-    {r2*100:.2f}% variasi jumlah wisatawan.
-    """
-)
-
-# =====================================================
-# INFORMASI DATASET
-# =====================================================
-
-st.markdown("---")
 
 st.subheader("📁 Informasi Dataset")
 
@@ -302,74 +137,209 @@ with col2:
         len(X.columns)
     )
 
-st.write("Fitur yang digunakan:")
-
-st.write(list(X.columns))
-
 # =====================================================
-# KOEFISIEN REGRESI
+# TRAIN MODEL
 # =====================================================
 
 st.markdown("---")
 
-st.subheader("📈 Koefisien Regresi")
+st.subheader("⚙️ Training Model")
 
-coef_df = pd.DataFrame({
-    'Variabel': X.columns,
-    'Koefisien': model.coef_
-})
+if st.button("Train Model"):
 
-coef_df = coef_df.sort_values(
-    by='Koefisien',
-    key=abs,
-    ascending=False
-)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42
+    )
 
-st.dataframe(
-    coef_df,
-    use_container_width=True
-)
+    model = LinearRegression()
+
+    model.fit(
+        X_train,
+        y_train
+    )
+
+    y_pred = model.predict(X_test)
+
+    mae = mean_absolute_error(
+        y_test,
+        y_pred
+    )
+
+    mse = mean_squared_error(
+        y_test,
+        y_pred
+    )
+
+    rmse = np.sqrt(mse)
+
+    r2 = r2_score(
+        y_test,
+        y_pred
+    )
+
+    st.session_state["model"] = model
+    st.session_state["mae"] = mae
+    st.session_state["rmse"] = rmse
+    st.session_state["r2"] = r2
+    st.session_state["y_test"] = y_test
+    st.session_state["y_pred"] = y_pred
+
+    st.success("Model berhasil dilatih!")
 
 # =====================================================
-# VISUALISASI KOEFISIEN
+# EVALUASI MODEL
 # =====================================================
 
-fig, ax = plt.subplots(figsize=(10,5))
+if "model" in st.session_state:
 
-ax.bar(
-    coef_df['Variabel'],
-    coef_df['Koefisien']
-)
+    st.markdown("---")
 
-plt.xticks(rotation=45)
+    st.subheader("📊 Evaluasi Model")
 
-plt.title(
-    "Pengaruh Faktor Terhadap Jumlah Wisatawan"
-)
+    col1, col2, col3 = st.columns(3)
 
-st.pyplot(fig)
+    with col1:
+        st.metric(
+            "MAE",
+            f"{st.session_state['mae']:,.2f}"
+        )
+
+    with col2:
+        st.metric(
+            "RMSE",
+            f"{st.session_state['rmse']:,.2f}"
+        )
+
+    with col3:
+        st.metric(
+            "R²",
+            f"{st.session_state['r2']:.4f}"
+        )
+
+    st.info(
+        f"""
+        Model mampu menjelaskan sekitar
+        {st.session_state['r2']*100:.2f}%
+        variasi jumlah wisatawan.
+        """
+    )
 
 # =====================================================
-# AKTUAL VS PREDIKSI
+# GRAFIK AKTUAL VS PREDIKSI
+# =====================================================
+
+if "model" in st.session_state:
+
+    st.markdown("---")
+
+    st.subheader("📈 Grafik Aktual vs Prediksi")
+
+    chart_df = pd.DataFrame({
+        "Aktual":
+        st.session_state["y_test"].values[:100],
+
+        "Prediksi":
+        st.session_state["y_pred"][:100]
+    })
+
+    st.line_chart(chart_df)
+
+# =====================================================
+# INPUT PREDIKSI
 # =====================================================
 
 st.markdown("---")
 
-st.subheader("📉 Aktual vs Prediksi")
+st.subheader("🔮 Prediksi Wisatawan")
 
-fig2, ax2 = plt.subplots(figsize=(6,6))
-
-ax2.scatter(
-    y_test,
-    y_pred
+tanggal = st.date_input(
+    "Tanggal"
 )
 
-ax2.set_xlabel("Aktual")
-
-ax2.set_ylabel("Prediksi")
-
-ax2.set_title(
-    "Aktual vs Prediksi"
+heatwave = st.selectbox(
+    "Heatwave",
+    [0, 1]
 )
 
-st.pyplot(fig2)
+heavyrain = st.selectbox(
+    "Heavy Rain",
+    [0, 1]
+)
+
+strongwind = st.selectbox(
+    "Strong Wind",
+    [0, 1]
+)
+
+# =====================================================
+# PREDIKSI
+# =====================================================
+
+if "model" in st.session_state:
+
+    if st.button("Prediksi"):
+
+        tanggal = pd.to_datetime(
+            tanggal
+        )
+
+        month = tanggal.month
+        year = tanggal.year
+        day = tanggal.day
+        dayofweek = tanggal.dayofweek
+
+        quarter = (
+            (month - 1) // 3
+        ) + 1
+
+        weekend = (
+            1 if dayofweek >= 5
+            else 0
+        )
+
+        lag_1 = df[
+            'Total_arrivals'
+        ].iloc[-1]
+
+        lag_7 = df[
+            'Total_arrivals'
+        ].iloc[-7]
+
+        input_user = pd.DataFrame(
+            [[
+                heatwave,
+                heavyrain,
+                strongwind,
+                month,
+                year,
+                day,
+                dayofweek,
+                quarter,
+                weekend,
+                lag_1,
+                lag_7
+            ]],
+            columns=X.columns
+        )
+
+        hasil = st.session_state[
+            "model"
+        ].predict(
+            input_user
+        )
+
+        st.success(
+            f"""
+            Prediksi Jumlah Wisatawan:
+            {hasil[0]:,.0f} orang
+            """
+        )
+
+else:
+
+    st.warning(
+        "Silakan klik Train Model terlebih dahulu."
+    )
