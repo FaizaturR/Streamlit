@@ -18,14 +18,15 @@ import matplotlib.pyplot as plt
 # =====================================================
 
 st.set_page_config(
-    page_title="Prediksi Kepadatan Wisata Jeju",
+    page_title="Analisis Faktor Kepadatan Wisata",
     layout="wide"
 )
 
-st.title("🏝️ Prediksi Kepadatan Wisata Jeju")
+# [DIUBAH] Judul disesuaikan dengan judul penelitian
+st.title("📊 Analisis Faktor yang Mempengaruhi Kepadatan Wisata")
 st.write(
-    "Analisis Faktor yang Mempengaruhi Kepadatan Wisata "
-    "Menggunakan Multiple Linear Regression"
+    "Menggunakan Multiple Linear Regression "
+    "| Studi Kasus: Data Kunjungan Wisatawan"
 )
 
 # =====================================================
@@ -180,12 +181,24 @@ if st.button("Train Model"):
         y_pred
     )
 
+    # [BARU] Simpan koefisien ke session_state untuk analisis faktor
+    coef_df = pd.DataFrame({
+        'Faktor': X.columns,
+        'Koefisien': model.coef_
+    }).sort_values(
+        by='Koefisien',
+        key=abs,
+        ascending=True
+    )
+
     st.session_state["model"] = model
     st.session_state["mae"] = mae
     st.session_state["rmse"] = rmse
     st.session_state["r2"] = r2
     st.session_state["y_test"] = y_test
     st.session_state["y_pred"] = y_pred
+    st.session_state["coef_df"] = coef_df   # [BARU]
+    st.session_state["intercept"] = model.intercept_  # [BARU]
 
     st.success("Model berhasil dilatih!")
 
@@ -223,8 +236,112 @@ if "model" in st.session_state:
         f"""
         Model mampu menjelaskan sekitar
         {st.session_state['r2']*100:.2f}%
-        variasi jumlah wisatawan.
+        variasi jumlah wisatawan (kepadatan wisata).
         """
+    )
+
+# =====================================================
+# [BARU] ANALISIS FAKTOR — TABEL KOEFISIEN
+# =====================================================
+
+if "coef_df" in st.session_state:
+
+    st.markdown("---")
+
+    # [BARU] Seksi analisis faktor — inti dari judul penelitian
+    st.subheader("🔍 Analisis Faktor yang Mempengaruhi Kepadatan Wisata")
+
+    st.write(
+        "Tabel berikut menampilkan koefisien regresi setiap faktor. "
+        "Koefisien positif berarti faktor tersebut **meningkatkan** "
+        "kepadatan wisata, sedangkan koefisien negatif berarti "
+        "**menurunkan** kepadatan wisata."
+    )
+
+    coef_display = st.session_state["coef_df"].copy()
+    coef_display = coef_display.sort_values(
+        by='Koefisien', key=abs, ascending=False
+    )
+    coef_display.index = range(1, len(coef_display) + 1)
+    coef_display.index.name = "Rank"
+    coef_display['Koefisien'] = coef_display['Koefisien'].map(
+        lambda x: f"{x:+,.2f}"
+    )
+
+    st.dataframe(
+        coef_display,
+        use_container_width=True
+    )
+
+# =====================================================
+# [BARU] VISUALISASI KOEFISIEN FAKTOR (BAR CHART)
+# =====================================================
+
+if "coef_df" in st.session_state:
+
+    st.markdown("---")
+
+    st.subheader("📊 Visualisasi Pengaruh Faktor terhadap Kepadatan Wisata")
+
+    coef_plot = st.session_state["coef_df"].copy()
+
+    # [BARU] Warna: merah untuk pengaruh negatif, biru untuk positif
+    colors = [
+        '#d62728' if v < 0 else '#1f77b4'
+        for v in coef_plot['Koefisien']
+    ]
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+
+    bars = ax.barh(
+        coef_plot['Faktor'],
+        coef_plot['Koefisien'],
+        color=colors,
+        edgecolor='white',
+        height=0.6
+    )
+
+    # [BARU] Tambahkan label nilai di setiap bar
+    for bar, val in zip(bars, coef_plot['Koefisien']):
+        x_pos = val + (200 if val >= 0 else -200)
+        ha = 'left' if val >= 0 else 'right'
+        ax.text(
+            x_pos,
+            bar.get_y() + bar.get_height() / 2,
+            f'{val:+,.0f}',
+            va='center',
+            ha=ha,
+            fontsize=9
+        )
+
+    ax.axvline(x=0, color='black', linewidth=0.8, linestyle='--')
+    ax.set_xlabel('Koefisien Regresi', fontsize=11)
+    ax.set_title(
+        'Pengaruh Setiap Faktor terhadap Kepadatan Wisata\n'
+        '(Merah = Menurunkan | Biru = Meningkatkan)',
+        fontsize=12,
+        pad=12
+    )
+    ax.grid(axis='x', linestyle='--', alpha=0.4)
+    plt.tight_layout()
+
+    st.pyplot(fig)
+    plt.close(fig)
+
+    # [BARU] Interpretasi otomatis faktor paling dominan
+    coef_raw = st.session_state["coef_df"].copy()
+    most_negative = coef_raw.loc[coef_raw['Koefisien'].idxmin()]
+    most_positive = coef_raw.loc[coef_raw['Koefisien'].idxmax()]
+
+    st.write(
+        f"📌 **Faktor paling menurunkan kepadatan wisata:** "
+        f"**{most_negative['Faktor']}** "
+        f"(koefisien {most_negative['Koefisien']:+,.2f})"
+    )
+    st.write(
+        f"📌 **Faktor paling meningkatkan kepadatan wisata:** "
+        f"**{most_positive['Faktor']}** "
+        f"(koefisien {most_positive['Koefisien']:+,.2f})"
     )
 
 # =====================================================
@@ -235,7 +352,7 @@ if "model" in st.session_state:
 
     st.markdown("---")
 
-    st.subheader("📈 Grafik Aktual vs Prediksi")
+    st.subheader("📈 Grafik Aktual vs Prediksi Kepadatan Wisata")
 
     chart_df = pd.DataFrame({
         "Aktual":
@@ -253,25 +370,34 @@ if "model" in st.session_state:
 
 st.markdown("---")
 
-st.subheader("🔮 Prediksi Wisatawan")
+# [DIUBAH] Label subheader lebih sesuai konteks analisis
+st.subheader("🔮 Simulasi Prediksi Kepadatan Wisata")
+
+st.write(
+    "Masukkan kondisi faktor-faktor di bawah ini untuk "
+    "mendapatkan estimasi kepadatan wisata (jumlah wisatawan)."
+)
 
 tanggal = st.date_input(
     "Tanggal"
 )
 
 heatwave = st.selectbox(
-    "Heatwave",
-    [0, 1]
+    "Heatwave (Gelombang Panas ≥ 33°C)",   # [DIUBAH] label lebih deskriptif
+    [0, 1],
+    format_func=lambda x: "Tidak (0)" if x == 0 else "Ya (1)"
 )
 
 heavyrain = st.selectbox(
-    "Heavy Rain",
-    [0, 1]
+    "Heavy Rain (Hujan Lebat ≥ 80mm)",       # [DIUBAH] label lebih deskriptif
+    [0, 1],
+    format_func=lambda x: "Tidak (0)" if x == 0 else "Ya (1)"
 )
 
 strongwind = st.selectbox(
-    "Strong Wind",
-    [0, 1]
+    "Strong Wind (Angin Kencang ≥ 14m/s)",   # [DIUBAH] label lebih deskriptif
+    [0, 1],
+    format_func=lambda x: "Tidak (0)" if x == 0 else "Ya (1)"
 )
 
 # =====================================================
@@ -280,7 +406,7 @@ strongwind = st.selectbox(
 
 if "model" in st.session_state:
 
-    if st.button("Prediksi"):
+    if st.button("Prediksi Kepadatan Wisata"):  # [DIUBAH] label tombol
 
         tanggal = pd.to_datetime(
             tanggal
@@ -333,10 +459,48 @@ if "model" in st.session_state:
 
         st.success(
             f"""
-            Prediksi Jumlah Wisatawan:
+            Estimasi Kepadatan Wisata:
             {hasil[0]:,.0f} orang
             """
         )
+
+        # [BARU] Tampilkan kontribusi faktor cuaca pada prediksi ini
+        if heatwave == 1 or heavyrain == 1 or strongwind == 1:
+            coef_ref = dict(
+                zip(
+                    st.session_state["coef_df"]["Faktor"],
+                    st.session_state["coef_df"]["Koefisien"]
+                        if "Koefisien" in st.session_state["coef_df"].columns
+                        else []
+                )
+            )
+
+            # Ambil ulang koefisien dari model langsung
+            coef_map = dict(
+                zip(X.columns, st.session_state["model"].coef_)
+            )
+
+            notes = []
+            if heatwave == 1:
+                notes.append(
+                    f"Heatwave berkontribusi "
+                    f"{coef_map['Heatwave']:+,.0f} wisatawan"
+                )
+            if heavyrain == 1:
+                notes.append(
+                    f"Heavy Rain berkontribusi "
+                    f"{coef_map['HeavyRain']:+,.0f} wisatawan"
+                )
+            if strongwind == 1:
+                notes.append(
+                    f"Strong Wind berkontribusi "
+                    f"{coef_map['StrongWind']:+,.0f} wisatawan"
+                )
+
+            st.warning(
+                "⚠️ Dampak faktor cuaca pada prediksi ini:\n"
+                + "\n".join(f"• {n}" for n in notes)
+            )
 
 else:
 
